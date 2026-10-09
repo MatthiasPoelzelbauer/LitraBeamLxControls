@@ -48,6 +48,11 @@ final class LitraDevice {
         writer.enqueue(reports, key: key)
     }
 
+    /// Drops waiting reports and writes these immediately, blocking until they are sent.
+    func sendNow(_ reports: [[UInt8]]) {
+        writer.writeNow(reports)
+    }
+
     private func attach(_ device: IOHIDDevice) {
         self.device = device
         writer.device = device
@@ -104,11 +109,24 @@ private final class ReportWriter: @unchecked Sendable {
         }
     }
 
+    func writeNow(_ reports: [[UInt8]]) {
+        let device: IOHIDDevice? = lock.withLock {
+            pending = []
+            return currentDevice
+        }
+        guard let device else { return }
+        reports.forEach { write($0, to: device) }
+    }
+
     private func writePending() {
         while let (device, report) = nextReport() {
-            report.withUnsafeBufferPointer { buffer in
-                _ = IOHIDDeviceSetReport(device, kIOHIDReportTypeOutput, CFIndex(LitraProtocol.reportID), buffer.baseAddress!, buffer.count)
-            }
+            write(report, to: device)
+        }
+    }
+
+    private func write(_ report: [UInt8], to device: IOHIDDevice) {
+        report.withUnsafeBufferPointer { buffer in
+            _ = IOHIDDeviceSetReport(device, kIOHIDReportTypeOutput, CFIndex(LitraProtocol.reportID), buffer.baseAddress!, buffer.count)
         }
     }
 

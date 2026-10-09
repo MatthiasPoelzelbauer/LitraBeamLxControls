@@ -14,7 +14,7 @@ struct LitraApp: App {
     var body: some Scene {
         // The menu bar item is only shown while the light is connected.
         MenuBarExtra(
-            "Litra",
+            "Litra Beam LX",
             systemImage: state.frontOn || state.backOn ? "sun.max.fill" : "sun.max",
             isInserted: Binding(get: { state.device.isConnected }, set: { _ in })
         ) {

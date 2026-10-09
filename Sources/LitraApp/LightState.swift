@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import LitraCore
 import Observation
 
@@ -17,8 +17,11 @@ final class LightState {
     var backColor: Int { didSet { changed(backColor, "backColor", backColorReports) } }
 
     @ObservationIgnored private let defaults = UserDefaults.standard
-    /// True while applying values read from the device, so they are not sent back.
+    /// True while applying values that are already on the device, so they are not sent again.
     @ObservationIgnored private var isSyncing = false
+    /// Lights that were on when the Mac went to sleep, restored after wake.
+    @ObservationIgnored private var lightsBeforeSleep: (front: Bool, back: Bool)?
+    @ObservationIgnored private var wokeAt: Date?
 
     init() {
         defaults.register(defaults: [
@@ -32,8 +35,48 @@ final class LightState {
         backPercent = defaults.integer(forKey: "backPercent")
         backColor = defaults.integer(forKey: "backColor")
 
-        device.onConnect = { [weak self] in self?.readFromDevice() }
+        device.onConnect = { [weak self] in
+            self?.restoreAfterSleep()
+            self?.readFromDevice()
+        }
         device.onReport = { [weak self] in self?.apply($0) }
+
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.willSleepNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.turnOffForSleep() }
+        }
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.wokeAt = Date()
+                self?.restoreAfterSleep()
+            }
+        }
+    }
+
+    /// Turns both lights off when the Mac goes to sleep, e.g. when the lid is closed.
+    private func turnOffForSleep() {
+        lightsBeforeSleep = (frontOn, backOn)
+        wokeAt = nil
+        device.sendNow([LitraProtocol.frontPower(false), LitraProtocol.backPower(false)])
+        isSyncing = true
+        defer { isSyncing = false }
+        frontOn = false
+        backOn = false
+    }
+
+    /// Switches the lights back on after wake. Over Bluetooth the light often reconnects a few seconds
+    /// after wake, so a reconnect within 30 seconds restores them as well.
+    private func restoreAfterSleep() {
+        guard let lights = lightsBeforeSleep, let wokeAt, Date().timeIntervalSince(wokeAt) < 30, device.isConnected else { return }
+        frontOn = lights.front
+        backOn = lights.back
     }
 
     func readFromDevice() {

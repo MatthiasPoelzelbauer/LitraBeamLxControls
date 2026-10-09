@@ -15,8 +15,8 @@ struct MenuView: View {
                         .font(.title2)
                         .foregroundStyle(.orange)
                     VStack(alignment: .leading) {
-                        Text("Litra Beam LX").font(.headline)
-                        Text(state.device.connection).font(.subheadline).foregroundStyle(.secondary)
+                        Text("Litra Beam LX").font(.body.weight(.semibold))
+                        Text(state.device.connection).font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
                     Button("Quit") { NSApplication.shared.terminate(nil) }
@@ -69,6 +69,7 @@ struct MenuView: View {
             }
             .padding()
         }
+        .font(.callout)
         .frame(width: 320)
     }
 
@@ -85,13 +86,15 @@ struct MenuView: View {
         VStack(alignment: .leading, spacing: 12) {
             Toggle(isOn: isOn) {
                 Label {
-                    Text(title).font(.headline)
+                    Text(title).font(.callout.weight(.semibold))
                 } icon: {
                     Image(systemName: systemImage).rotationEffect(.degrees(rotated ? 180 : 0))
                 }
             }
             .toggleStyle(.switch)
+            // SF Mono: a more distinctive face with a slashed zero for the controls.
             content()
+                .font(.system(.callout, design: .monospaced))
                 .disabled(!isOn.wrappedValue)
         }
         .padding()
@@ -103,7 +106,7 @@ struct MenuView: View {
             HStack {
                 Text(title)
                 Spacer()
-                Text(value).monospacedDigit().foregroundStyle(.secondary)
+                Text(value).foregroundStyle(.secondary)
             }
             slider()
         }
